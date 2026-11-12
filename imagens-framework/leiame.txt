@@ -1,0 +1,15 @@
+LEIAME - IMAGENS DOS TEMAS
+
+Este repositorio tem uma pasta para cada tema do site (Academia, Banda, Jogo, Lanches, Pets e Portfolio), com as imagens usadas nele.
+
+COMO USAR
+
+1. Baixe SOMENTE as pastas dos temas (Academia, Banda, Jogo, Lanches, Pets e Portfolio).
+
+2. Coloque essas pastas na pasta do projeto no seu computador, no mesmo lugar onde estao os arquivos .html, .css e .js.
+
+3. Nao mude o nome das pastas: elas precisam ficar iguais as do GitHub.
+
+OBSERVACAO
+
+A pasta "imagens-framework" NAO vai junto. Ela só comporta as pastas de temas aqui no Github.
