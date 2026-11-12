@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Framework Tangível</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+
+  <link rel="stylesheet" href="portas_abertas.css">
+</head>
+
+<body>
+  <!-- SITE EM TELA CHEIA -->
+  <div class="stage" id="stage">
+    <div class="site" id="site"></div>
+  </div>
+
+  <!-- BOTÕES INVISÍVEIS (aparecem só ao passar o mouse) -->
+  <button type="button" class="hot" id="centralToggle"
+    aria-label="Abrir central"
+    aria-expanded="false" aria-controls="central">⚙️ Central</button>
+
+  <button type="button" class="hot" id="logToggle"
+    aria-label="Abrir log"
+    aria-expanded="false" aria-controls="logPanel">📋 Log</button>
+
+  <button type="button" class="hot" id="themeToggle"
+    aria-label="Tema atual" aria-controls="central">
+    <span class="theme-label" id="themeLabel">Tema: Não definido</span>
+  </button>
+
+  <!-- CÂMERA FLUTUANTE (arraste pelo topo) -->
+  <div class="cam" id="camWindow">
+    <div class="cam-head" id="camHandle">
+      <span>📷 Câmera</span>
+      <button type="button" class="cam-min" id="camMin" aria-label="Minimizar câmera">–</button>
+    </div>
+    <div class="scanner" id="scanner">
+      <video id="video" playsinline muted></video>
+      <div class="scanner-frame"></div>
+      <div class="scanner-status" id="scannerStatus">Iniciando câmera...</div>
+    </div>
+    <canvas id="canvas" hidden></canvas>
+  </div>
+
+  <!-- CENTRAL -->
+  <aside class="drawer" id="central" aria-label="Central" inert>
+    <div class="drawer-head">
+      <div class="brand">
+        <div class="brand-icon">🧩</div>
+        <div>
+          <h1>Framework Tangível</h1>
+          <p>Inversão de controle por QR Code</p>
+        </div>
+      </div>
+      <button type="button" class="btn small" id="closeCentral">Fechar ×</button>
+    </div>
+
+    <section class="group">
+      <div class="group-title">Peças UI <span>componentes</span></div>
+      <div class="cards" id="componentCards"></div>
+    </section>
+
+    <section class="group">
+      <div class="group-title">Temas Tangíveis <span>contexto</span></div>
+      <div class="cards" id="themeCards"></div>
+    </section>
+
+    <section class="group">
+      <div class="group-title">Ações <span>site</span></div>
+      <div class="actions">
+        <button class="btn active" id="desktopButton">🖥️ Desktop</button>
+        <button class="btn" id="mobileButton">📱 Mobile</button>
+        <button class="btn primary" id="codeButton">&lt;/&gt; Código</button>
+        <button type="button" class="btn" id="tangibleCustomizeButton" aria-expanded="false" aria-controls="tangibleColorPanel">🎨 Personalizar</button>
+        <button class="btn" id="extractSiteBtn" style="background: #10b981; color: white; border-color: #10b981; font-weight: bold;">📦 Extrair Site</button>
+        <button class="btn" id="resetButton">↻ Resetar</button>
+      </div>
+    </section>
+
+    <div class="concept">
+      <strong>Conceito didático: IoC</strong>
+      Com Inversão de Controle, o framework decide como e onde cada
+      componente será renderizado quando a peça QR for reconhecida.
+    </div>
+  </aside>
+
+  <!-- LOG -->
+  <section class="drawer" id="logPanel" aria-label="Log" inert>
+    <div class="drawer-head">
+      <strong>Log do framework</strong>
+      <button type="button" class="btn small" id="closeLog">Fechar ×</button>
+    </div>
+
+    <div class="devtools">
+      <div class="devpanel">
+        <div class="devhead">
+          <span>
+            Árvore de componentes ·
+            <span id="activeCount">0 ativos</span>
+          </span>
+          <span id="renderCount">Re-renders: 0</span>
+        </div>
+        <div class="devbody" id="tree"></div>
+      </div>
+
+      <div class="devpanel">
+        <div class="devhead">
+          <span>Event Log</span>
+          <button class="btn small" id="clearLog">Limpar</button>
+        </div>
+        <div class="devbody" id="log"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODAL DE CÓDIGO -->
+  <div class="modal" id="codeModal">
+    <section class="modal-window">
+      <div class="modal-head">
+        <div>
+          <strong>Código do site montado</strong><br>
+          <small>Exibe as peças atualmente montadas pelos QR Codes.</small>
+        </div>
+        <div class="modal-actions">
+          <button class="btn small" id="copyCode">Copiar aba atual</button>
+          <button class="btn small" id="downloadHtml">Baixar HTML</button>
+          <button class="btn small" id="downloadCss">Baixar CSS</button>
+          <button class="btn small" id="closeModal">Fechar ×</button>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="html">HTML</button>
+        <button class="tab" data-tab="css">CSS</button>
+      </div>
+
+      <div class="editor-wrap">
+        <textarea id="codeEditor" readonly spellcheck="false"></textarea>
+      </div>
+
+      <div class="modal-foot" id="codeStatus">Código do site.</div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="portas_abertas.js"></script>
+
+  <!-- Botões invisíveis: clique abre, clicar e arrastar move -->
+  <script>
+    (() => {
+      const KEY = "framework-hot-positions";
+      const MOVE_PX = 5;
+      let saved = {};
+      try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
+
+      function place(btn, x, y) {
+        x = Math.min(Math.max(0, x), innerWidth - btn.offsetWidth);
+        y = Math.min(Math.max(0, y), innerHeight - btn.offsetHeight);
+        btn.style.left = x + "px";
+        btn.style.top = y + "px";
+        btn.style.right = btn.style.bottom = "auto";
+      }
+
+      ["centralToggle", "logToggle", "themeToggle"].forEach(id => {
+        const btn = document.getElementById(id);
+        let pressed = false, dragging = false, justDragged = false;
+        let startX = 0, startY = 0, offX = 0, offY = 0;
+
+        if (saved[id]) place(btn, saved[id].x, saved[id].y);
+
+        btn.addEventListener("pointerdown", e => {
+          const r = btn.getBoundingClientRect();
+          startX = e.clientX; startY = e.clientY;
+          offX = e.clientX - r.left; offY = e.clientY - r.top;
+          pressed = true; dragging = false;
+          btn.setPointerCapture(e.pointerId);
+        });
+
+        btn.addEventListener("pointermove", e => {
+          if (!pressed) return;
+          if (!dragging) {
+            if (Math.hypot(e.clientX - startX, e.clientY - startY) < MOVE_PX) return;
+            dragging = true;
+            btn.classList.add("dragging");
+          }
+          place(btn, e.clientX - offX, e.clientY - offY);
+        });
+
+        function end() {
+          pressed = false;
+          if (!dragging) return;
+          dragging = false;
+          justDragged = true;
+          btn.classList.remove("dragging");
+          const r = btn.getBoundingClientRect();
+          saved[id] = { x: r.left, y: r.top };
+          try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+          setTimeout(() => { justDragged = false; }, 80);
+        }
+        btn.addEventListener("pointerup", end);
+        btn.addEventListener("pointercancel", end);
+
+        /* Depois de arrastar, o clique não abre o painel. */
+        btn.addEventListener("click", e => {
+          if (justDragged) { e.stopImmediatePropagation(); e.preventDefault(); }
+        });
+      });
+
+      addEventListener("resize", () => {
+        ["centralToggle", "logToggle", "themeToggle"].forEach(id => {
+          if (!saved[id]) return;
+          const btn = document.getElementById(id);
+          const r = btn.getBoundingClientRect();
+          place(btn, r.left, r.top);
+        });
+      });
+    })();
+  </script>
+
+  <!-- Abrir/fechar Central e Log (só interface) -->
+  <script>
+    (() => {
+      const central = document.getElementById("central");
+      const logPanel = document.getElementById("logPanel");
+      const centralBtn = document.getElementById("centralToggle");
+      const logBtn = document.getElementById("logToggle");
+
+      function setOpen(panel, button, open) {
+        panel.classList.toggle("open", open);
+        panel.inert = !open;
+        button.setAttribute("aria-expanded", String(open));
+      }
+
+      function closeAll() {
+        setOpen(central, centralBtn, false);
+        setOpen(logPanel, logBtn, false);
+      }
+
+      function toggleCentral() {
+        const open = !central.classList.contains("open");
+        closeAll();
+        setOpen(central, centralBtn, open);
+      }
+
+      function toggleLog() {
+        const open = !logPanel.classList.contains("open");
+        closeAll();
+        setOpen(logPanel, logBtn, open);
+      }
+
+      centralBtn.addEventListener("click", toggleCentral);
+      document.getElementById("themeToggle").addEventListener("click", toggleCentral);
+      logBtn.addEventListener("click", toggleLog);
+
+      document.getElementById("closeCentral").addEventListener("click", closeAll);
+      document.getElementById("closeLog").addEventListener("click", closeAll);
+
+      /* Ao personalizar ou ver o código, libera a tela. */
+      ["tangibleCustomizeButton", "codeButton"].forEach(id => {
+        document.getElementById(id).addEventListener("click", closeAll);
+      });
+
+      document.addEventListener("keydown", event => {
+        if (event.key === "Escape") closeAll();
+      });
+    })();
+  </script>
+
+  <!-- Câmera arrastável -->
+  <script>
+    (() => {
+      const win = document.getElementById("camWindow");
+      const handle = document.getElementById("camHandle");
+      let dx = 0, dy = 0, dragging = false;
+
+      function place(x, y) {
+        x = Math.min(Math.max(0, x), innerWidth - win.offsetWidth);
+        y = Math.min(Math.max(0, y), innerHeight - win.offsetHeight);
+        win.style.left = x + "px";
+        win.style.top = y + "px";
+        win.style.right = win.style.bottom = "auto";
+      }
+
+      handle.addEventListener("pointerdown", e => {
+        if (e.target.closest("button")) return;
+        const r = win.getBoundingClientRect();
+        dx = e.clientX - r.left;
+        dy = e.clientY - r.top;
+        dragging = true;
+        handle.setPointerCapture(e.pointerId);
+        win.classList.add("dragging");
+      });
+      handle.addEventListener("pointermove", e => {
+        if (dragging) place(e.clientX - dx, e.clientY - dy);
+      });
+      const stop = () => { dragging = false; win.classList.remove("dragging"); };
+      handle.addEventListener("pointerup", stop);
+      handle.addEventListener("pointercancel", stop);
+
+      document.getElementById("camMin").addEventListener("click", e => {
+        win.classList.toggle("min");
+        e.target.textContent = win.classList.contains("min") ? "+" : "–";
+      });
+
+      addEventListener("resize", () => {
+        const r = win.getBoundingClientRect();
+        place(r.left, r.top);
+      });
+    })();
+  </script>
+</body>
+</html>
