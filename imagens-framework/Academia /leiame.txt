@@ -1,1 +1,0 @@
-Este arquivo nao faz nada. Ele existe so para o GitHub criar esta pasta.
